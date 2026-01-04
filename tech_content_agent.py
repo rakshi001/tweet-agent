@@ -1,5 +1,6 @@
-# tech_content_agent.py
-import google.generativeai as genai
+# tech_content_agent.py - UPDATED FOR NEW GOOGLE GENAI SDK
+from google import genai
+from google.genai import types
 import json
 import os
 from datetime import datetime
@@ -9,8 +10,7 @@ import random
 class TechContentGenerator:
     def __init__(self, gemini_api_key):
         """Initialize the content generator with Gemini API"""
-        genai.configure(api_key=gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.client = genai.Client(api_key=gemini_api_key)
         
         # Content categories for variety
         self.categories = [
@@ -48,7 +48,11 @@ class TechContentGenerator:
             prompt = self._build_prompt(category, post_type)
             
             try:
-                response = self.model.generate_content(prompt)
+                response = self.client.models.generate_content(
+                    model='gemini-2.0-flash-exp',
+                    contents=prompt
+                )
+                
                 post_data = {
                     'content': response.text.strip(),
                     'category': category,
@@ -59,11 +63,13 @@ class TechContentGenerator:
                 }
                 posts.append(post_data)
                 
+                print(f"✅ Generated: {category} - {post_type}")
+                
                 # Rate limiting to avoid API throttling
                 time.sleep(2)
                 
             except Exception as e:
-                print(f"Error generating content: {e}")
+                print(f"❌ Error generating content: {e}")
                 continue
         
         return posts
@@ -121,11 +127,14 @@ Requirements:
         Format: Just the topic names, one per line, no numbering."""
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model='gemini-2.0-flash-exp',
+                contents=prompt
+            )
             topics = [t.strip() for t in response.text.strip().split('\n') if t.strip()]
             return topics[:5]
         except Exception as e:
-            print(f"Error fetching trends: {e}")
+            print(f"❌ Error fetching trends: {e}")
             return []
     
     def generate_trending_post(self, topic):
@@ -142,17 +151,20 @@ Requirements:
 Make it sound like a real tech professional sharing knowledge, not promotional."""
 
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model='gemini-2.0-flash-exp',
+                contents=prompt
+            )
             return response.text.strip()
         except Exception as e:
-            print(f"Error generating trending post: {e}")
+            print(f"❌ Error generating trending post: {e}")
             return None
     
     def save_content_queue(self, posts, filename='content_queue.json'):
         """Save generated posts to a file for review"""
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(posts, f, indent=2, ensure_ascii=False)
-        print(f"✅ Saved {len(posts)} posts to {filename}")
+        print(f"\n✅ Saved {len(posts)} posts to {filename}")
     
     def load_content_queue(self, filename='content_queue.json'):
         """Load previously generated posts"""
@@ -198,7 +210,7 @@ class PostScheduler:
 
 # Example usage
 def main():
-    print("🚀 Tech Content Generator")
+    print("🚀 Tech Content Generator (Updated)")
     print("=" * 50)
     
     # Get API key
@@ -211,7 +223,10 @@ def main():
     
     print("\n1. Generating trending topics...")
     topics = generator.get_trending_topics()
-    print(f"Found topics: {topics}")
+    if topics:
+        print(f"✅ Found topics: {topics}")
+    else:
+        print("⚠️  No trending topics found, continuing with regular content...")
     
     print("\n2. Generating content batch...")
     posts = generator.generate_content_batch(num_posts=14)  # 2 weeks
@@ -227,6 +242,7 @@ def main():
                 'topic': topic,
                 'generated_at': datetime.now().isoformat()
             })
+            print(f"✅ Generated trending post: {topic}")
     
     print(f"\n4. Generated {len(posts)} total posts")
     generator.save_content_queue(posts)
@@ -235,11 +251,16 @@ def main():
     schedule = scheduler.create_weekly_schedule(posts)
     scheduler.save_schedule(schedule)
     
-    print("\n✅ Content generation complete!")
+    print("\n" + "=" * 50)
+    print("✅ Content generation complete!")
+    print("=" * 50)
     print("\nNext steps:")
     print("1. Review content_queue.json")
     print("2. Edit/approve posts you like")
     print("3. Use manual_poster.py to post approved content")
+    print("\nTo review with web UI:")
+    print("  python content_reviewer.py")
+    print("  Then open: http://localhost:5000")
 
 
 if __name__ == "__main__":

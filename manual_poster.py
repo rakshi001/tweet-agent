@@ -103,6 +103,19 @@ def interactive_mode():
         elif choice == '3':
             break
 
+    def track_metrics(self):
+        me = self.client.get_me(user_fields=['public_metrics'])
+        metrics = me.data.public_metrics
+        
+        with open('growth_log.json', 'a') as f:
+            log = {
+                'date': datetime.now().isoformat(),
+                'followers': metrics['followers_count'],
+                'following': metrics['following_count'],
+                'tweets': metrics['tweet_count']
+            }
+            json.dump(log, f)
+            f.write('\n')       
 
 if __name__ == "__main__":
     interactive_mode()
